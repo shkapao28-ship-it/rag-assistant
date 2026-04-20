@@ -1,23 +1,50 @@
+# =========================
 # Python
+# =========================
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 *.pyo
 *.pyd
+
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
 
+# =========================
 # Secrets
+# =========================
 .env
 
-# Runtime / generated data
-chroma_data/
+# =========================
+# Logs / runtime / generated
+# =========================
 logs/
 processed/
 failed/
+chroma_data/
+*.log
 
+# =========================
 # IDE / OS
+# =========================
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+
+# =========================
+# Local archives / temp files
+# =========================
+5-7.zip
+
+# =========================
+# Files to exclude from repo
+# =========================
+faq_test.txt
+ДЗ/
+ТЗ на создание .txt
+Промт для создания rag.txt
+Новый текстовый документ.txt
