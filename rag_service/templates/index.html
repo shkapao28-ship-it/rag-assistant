@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Assistant</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div>
+        <div class="eyebrow">RAG Console</div>
+        <h1>Панель вопросов</h1>
+      </div>
+      <nav class="topnav">
+        <a class="nav-link active" href="{{ url_for('index') }}">Вопросы</a>
+        <a class="nav-link" href="{{ url_for('admin') }}">Админка</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container page-grid">
+    <section class="panel panel-main">
+      <div class="panel-header">
+        <h2>Задать вопрос</h2>
+        <p>Выбери коллекцию, режим и top_k, затем проверь retrieval, rerank и итоговый ответ.</p>
+      </div>
+
+      <form method="post" class="ask-form">
+        <div>
+          <label class="field-label" for="query">Вопрос</label>
+          <textarea id="query" name="query" class="input textarea" placeholder="например: сколько стоят тренировки?">{{ query or '' }}</textarea>
+        </div>
+
+        <div class="toolbar-grid">
+          <div>
+            <label class="field-label" for="collection">Коллекция</label>
+            <input id="collection" name="collection" class="input" value="{{ collection or 'faq' }}">
+          </div>
+
+          <div>
+            <label class="field-label" for="mode">Режим</label>
+            <select id="mode" name="mode" class="input select">
+              <option value="precise" {% if mode == 'precise' %}selected{% endif %}>precise</option>
+              <option value="balanced" {% if mode == 'balanced' %}selected{% endif %}>balanced</option>
+              <option value="recall" {% if mode == 'recall' %}selected{% endif %}>recall</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="field-label" for="top_k">top_k</label>
+            <input id="top_k" name="top_k" type="number" min="1" max="20" class="input" value="{{ top_k or 4 }}">
+          </div>
+
+          <div class="toolbar-action">
+            <button type="submit" class="btn btn-primary">Спросить</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    {% if diagnostics %}
+    <section class="panel metrics-panel">
+      <div class="panel-header">
+        <h2>Служебные метрики поиска</h2>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card"><span>collection</span><strong>{{ diagnostics.collection }}</strong></div>
+        <div class="metric-card"><span>mode</span><strong>{{ diagnostics.mode }}</strong></div>
+        <div class="metric-card"><span>top_k_requested</span><strong>{{ diagnostics.top_k }}</strong></div>
+        <div class="metric-card"><span>index_version</span><strong>{{ diagnostics.index_version }}</strong></div>
+        <div class="metric-card"><span>cache_hit</span><strong>{{ diagnostics.cache_hit }}</strong></div>
+        <div class="metric-card"><span>top_k_used</span><strong>{{ diagnostics.top_k_used }}</strong></div>
+        <div class="metric-card"><span>fetch_k_used</span><strong>{{ diagnostics.fetch_k_used }}</strong></div>
+        <div class="metric-card"><span>raw_found</span><strong>{{ diagnostics.raw_found }}</strong></div>
+        <div class="metric-card"><span>reranked_found</span><strong>{{ diagnostics.reranked_found }}</strong></div>
+        <div class="metric-card"><span>context_chunks_used</span><strong>{{ diagnostics.context_chunks_used }}</strong></div>
+        <div class="metric-card"><span>latency_ms</span><strong>{{ diagnostics.latency_ms }}</strong></div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if result %}
+    <section class="panel answer-panel">
+      <div class="panel-header">
+        <h2>Ответ</h2>
+      </div>
+      <div class="answer-box">
+        {{ result.answer }}
+      </div>
+    </section>
+
+    {% if result.debug %}
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Debug overview</h2>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><span>query</span><strong>{{ result.debug.query }}</strong></div>
+        <div class="metric-card"><span>collection</span><strong>{{ result.debug.collection }}</strong></div>
+        <div class="metric-card"><span>mode</span><strong>{{ result.debug.mode }}</strong></div>
+        <div class="metric-card"><span>fetch_k</span><strong>{{ result.debug.fetch_k }}</strong></div>
+        <div class="metric-card"><span>top_k_requested</span><strong>{{ result.debug.top_k_requested }}</strong></div>
+        <div class="metric-card"><span>raw_found</span><strong>{{ result.debug.raw_found }}</strong></div>
+        <div class="metric-card"><span>reranked_found</span><strong>{{ result.debug.reranked_found }}</strong></div>
+        <div class="metric-card"><span>shown_chunks</span><strong>{{ result.debug.shown_chunks }}</strong></div>
+        <div class="metric-card"><span>context_limit</span><strong>{{ result.debug.context_limit }}</strong></div>
+        <div class="metric-card"><span>context_chunks_used</span><strong>{{ result.debug.context_chunks_used }}</strong></div>
+        <div class="metric-card"><span>fallback_used</span><strong>{{ result.debug.fallback_used }}</strong></div>
+        <div class="metric-card"><span>multi_part_detected</span><strong>{{ result.debug.multi_part_detected }}</strong></div>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if result.context_chunks_preview %}
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Контекст, отправленный в LLM</h2>
+        <p>Это именно те чанки, которые реально попали в генерацию ответа.</p>
+      </div>
+
+      <div class="chunk-list">
+        {% for item in result.context_chunks_preview %}
+        <article class="chunk-card">
+          <div class="chunk-meta">
+            <span class="badge">used_in_context</span>
+            <span>{{ item.document_id }}</span>
+            <span>chunk {{ item.chunk_index }}</span>
+            {% if item.section %}
+            <span>section: {{ item.section }}</span>
+            {% endif %}
+          </div>
+
+          <div class="score-row mono">
+            <span>chunk_id: {{ item.chunk_id }}</span>
+            <span>distance: {{ '%.6f'|format(item.distance) }}</span>
+            <span>final_score: {{ '%.6f'|format(item.final_score) }}</span>
+            <span>semantic: {{ '%.6f'|format(item.semantic_score) }}</span>
+            <span>keyword: {{ '%.6f'|format(item.keyword_score) }}</span>
+          </div>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="panel sources-panel">
+      <div class="panel-header">
+        <h2>Найденные фрагменты</h2>
+        <p>Здесь показаны чанки после rerank. Отдельно видно, какие из них реально использовались в LLM-контексте.</p>
+      </div>
+
+      {% if result.chunks %}
+      <div class="chunk-list">
+        {% for chunk in result.chunks %}
+        <article class="chunk-card">
+          <div class="chunk-meta">
+            <span class="badge">{{ chunk.meta.collection or collection }}</span>
+            <span>{{ chunk.meta.file_name or chunk.document_id }}</span>
+            <span>chunk {{ chunk.meta.chunk_index }}</span>
+            {% if chunk.meta.section %}
+            <span>section: {{ chunk.meta.section }}</span>
+            {% endif %}
+            {% if chunk.used_in_context %}
+            <span class="badge">used_in_context</span>
+            {% endif %}
+          </div>
+
+          <div class="score-row mono">
+            <span>document_id: {{ chunk.document_id }}</span>
+            <span>distance: {{ '%.6f'|format(chunk.score) }}</span>
+            <span>final_score: {{ '%.6f'|format(chunk.final_score) }}</span>
+            <span>semantic: {{ '%.6f'|format(chunk.semantic_score) }}</span>
+            <span>keyword: {{ '%.6f'|format(chunk.keyword_score) }}</span>
+            {% if chunk.meta.document_hash %}
+            <span>hash: {{ chunk.meta.document_hash }}</span>
+            {% endif %}
+          </div>
+
+          <pre class="chunk-text">{{ chunk.text }}</pre>
+        </article>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="answer-box">
+        По этому запросу фрагменты не найдены.
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

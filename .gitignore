@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+
+# Runtime / generated data
+chroma_data/
+logs/
+processed/
+failed/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

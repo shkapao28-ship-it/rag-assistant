@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RAG Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <div>
+        <div class="eyebrow">RAG Console</div>
+        <h1>Админка</h1>
+      </div>
+      <nav class="topnav">
+        <a href="{{ url_for('index') }}" class="nav-link">Вопросы</a>
+        <a href="{{ url_for('admin') }}" class="nav-link active">Админка</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container admin-layout">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <section class="panel">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </section>
+      {% endif %}
+    {% endwith %}
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Состояние системы</h2>
+      </div>
+      <div class="metric-grid">
+        <div class="metric-card"><span>index_version</span><strong>{{ stats.index_version }}</strong></div>
+        <div class="metric-card"><span>input</span><strong>{{ stats.input_count }}</strong></div>
+        <div class="metric-card"><span>processed</span><strong>{{ stats.processed_count }}</strong></div>
+        <div class="metric-card"><span>failed</span><strong>{{ stats.failed_count }}</strong></div>
+        <div class="metric-card"><span>db_documents</span><strong>{{ stats.db_documents }}</strong></div>
+        <div class="metric-card"><span>db_chunks</span><strong>{{ stats.db_chunks }}</strong></div>
+        <div class="metric-card"><span>embedding_dim</span><strong>{{ stats.embedding_dim }}</strong></div>
+        <div class="metric-card"><span>collection_name</span><strong>{{ stats.collection_name }}</strong></div>
+        <div class="metric-card"><span>db_path</span><strong>{{ stats.db_path }}</strong></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Быстрые действия</h2>
+      </div>
+      <div class="action-row">
+        <form method="post" action="{{ url_for('ingest_all') }}">
+          <button class="btn btn-primary" type="submit">Индексировать все input</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_clear_cache') }}">
+          <button class="btn btn-secondary" type="submit">Очистить кэш ответов</button>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Загрузка файла</h2>
+      </div>
+      <form method="post" action="{{ url_for('admin_upload') }}" enctype="multipart/form-data" class="upload-form">
+        <input type="file" name="file" class="input">
+        <select name="collection" class="input select">
+          {% for item in collections %}
+          <option value="{{ item }}">{{ item }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit">Загрузить</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Batch-операции</h2>
+        <p>Операции применяются только к файлам из таблицы Processed.</p>
+      </div>
+      <form method="post" action="{{ url_for('admin_batch') }}">
+        <div class="action-row">
+          <button class="btn btn-danger" type="submit" name="action" value="delete_db" {% if not processed_files %}disabled{% endif %}>Удалить выбранные из БД</button>
+          <button class="btn btn-secondary" type="submit" name="action" value="reindex" {% if not processed_files %}disabled{% endif %}>Переиндексировать выбранные</button>
+          <button class="btn btn-warning" type="submit" name="action" value="delete_processed" {% if not processed_files %}disabled{% endif %}>Удалить selected processed + БД</button>
+        </div>
+
+        <div class="table-panel">
+          <h3>Processed</h3>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>collection</th>
+                <th>file</th>
+                <th>size</th>
+                <th>modified</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in processed_files %}
+              <tr>
+                <td><input type="checkbox" name="selected_files" value="{{ row.collection }}|{{ row.name }}|processed"></td>
+                <td><span class="badge">{{ row.collection }}</span></td>
+                <td>{{ row.name }}</td>
+                <td>{{ row.size }}</td>
+                <td>{{ row.modified }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Входящие файлы</h2>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>collection</th>
+            <th>file</th>
+            <th>size</th>
+            <th>modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in input_files %}
+          <tr>
+            <td><span class="badge">{{ row.collection }}</span></td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.size }}</td>
+            <td>{{ row.modified }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Документы в БД</h2>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>collection</th>
+            <th>file_name</th>
+            <th>document_id</th>
+            <th>chunks_count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in db_docs %}
+          <tr>
+            <td><span class="badge">{{ row.collection }}</span></td>
+            <td>{{ row.file_name }}</td>
+            <td class="mono">{{ row.document_id }}</td>
+            <td>{{ row.chunks_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Последние запросы</h2>
+      </div>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>time</th>
+            <th>collection</th>
+            <th>mode</th>
+            <th>top_k</th>
+            <th>raw</th>
+            <th>reranked</th>
+            <th>context</th>
+            <th>latency_ms</th>
+            <th>cache</th>
+            <th>query</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in query_log %}
+          <tr>
+            <td>{{ row.ts }}</td>
+            <td>{{ row.collection }}</td>
+            <td>{{ row.mode }}</td>
+            <td>{{ row.top_k }}</td>
+            <td>{{ row.raw_found }}</td>
+            <td>{{ row.reranked_found }}</td>
+            <td>{{ row.context_chunks_used }}</td>
+            <td>{{ row.latency_ms }}</td>
+            <td>{{ row.cache_hit }}</td>
+            <td>{{ row.query }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>
